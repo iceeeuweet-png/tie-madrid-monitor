@@ -1,4 +1,3 @@
-
 import os
 import json
 import urllib.request
@@ -15,15 +14,20 @@ def telegram(method, data=None):
 
 updates = telegram("getUpdates", {"timeout": 20})
 
-for update in updates.get("result", []):
-    message = update.get("message", {})
-    chat = message.get("chat", {})
-    chat_id = chat.get("id")
+messages = updates.get("result", [])
+print("Messages received:", len(messages))
 
-    if chat_id:
-        telegram("sendMessage", {
-            "chat_id": chat_id,
-            "text": "✅ TIE Madrid Monitor: Telegram connection successful!"
-        })
+if not updates.get("ok"):
+    raise Exception("Telegram API returned an error")
 
-print("Telegram test completed.")
+if messages:
+    chat_id = messages[-1]["message"]["chat"]["id"]
+
+    telegram("sendMessage", {
+        "chat_id": chat_id,
+        "text": "✅ Telegram connection successful! Your bot is working."
+    })
+
+    print("Test message sent successfully.")
+else:
+    print("No incoming messages. Send /start to the bot and try again.")

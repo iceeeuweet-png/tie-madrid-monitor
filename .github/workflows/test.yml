@@ -1,12 +1,15 @@
-
 name: Test Telegram Bot
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
     steps:
       - name: Download project
         uses: actions/checkout@v4

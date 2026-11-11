@@ -1,13 +1,13 @@
-name: Test Telegram Bot
+
+name: Madrid TIE Monitor
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
+  schedule:
+    - cron: "*/15 * * * *"
 
 jobs:
-  test:
+  monitor:
     runs-on: ubuntu-latest
 
     steps:
@@ -19,7 +19,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Test Telegram connection
-        run: python bot_test.py
+      - name: Run appointment monitor
+        run: python monitor.py
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}

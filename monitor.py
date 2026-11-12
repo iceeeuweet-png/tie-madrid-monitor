@@ -24,6 +24,11 @@ PROVINCES = [
 "Ceuta", "Melilla"
 ]
 
+SERVICES = [
+    "Toma de Huellas (Expedición de Tarjeta)",
+    "Recogida de Tarjeta TIE"
+]
+
 def telegram(method, data=None):
     payload = urllib.parse.urlencode(data or {}).encode()
     request = urllib.request.Request(BASE_URL + method, data=payload)

@@ -3,8 +3,13 @@ import os
 import json
 import urllib.request
 import urllib.parse
+import urllib.error
 
-TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+
+if not TOKEN:
+    raise RuntimeError("TELEGRAM_BOT_TOKEN is missing from GitHub Secrets.")
+
 BASE_URL = f"https://api.telegram.org/bot{TOKEN}/"
 
 PROVINCES = [
@@ -21,7 +26,7 @@ PROVINCES = [
     "Álava", "Bizkaia", "Gipuzkoa", "Navarra",
     "La Rioja", "Huesca", "Teruel", "Las Palmas",
     "Santa Cruz de Tenerife", "Baleares",
-"Ceuta", "Melilla"
+    "Ceuta", "Melilla"
 ]
 
 SERVICES = [
@@ -29,100 +34,182 @@ SERVICES = [
     "Recogida de Tarjeta TIE"
 ]
 
+
 def telegram(method, data=None):
-    payload = urllib.parse.urlencode(data or {}).encode()
-    request = urllib.request.Request(BASE_URL + method, data=payload)
+    payload = urllib.parse.urlencode(data or {}).encode("utf-8")
+
+    request = urllib.request.Request(
+        BASE_URL + method,
+        data=payload
+    )
+
     with urllib.request.urlopen(request, timeout=30) as response:
-        return json.loads(response.read().decode())
+        result = json.loads(response.read().decode("utf-8"))
+
+    if not result.get("ok"):
+        raise RuntimeError(f"Telegram API error: {result}")
+
+    return result
+
 
 def send_message(chat_id, message, keyboard=None):
-    data = {"chat_id": chat_id, "text": message}
+    data = {
+        "chat_id": chat_id,
+        "text": message
+    }
+
     if keyboard:
-        data["reply_markup"] = json.dumps(keyboard)
+        data["reply_markup"] = json.dumps(
+            keyboard,
+            ensure_ascii=False
+        )
+
     telegram("sendMessage", data)
+
+
+def show_services(chat_id):
+    buttons = [
+        [{"text": service}]
+        for service in SERVICES
+    ]
+
+    send_message(
+        chat_id,
+        "Select your service / Selecciona tu trámite:",
+        {
+            "keyboard": buttons,
+            "resize_keyboard": True
+        }
+    )
+
 
 def show_provinces(chat_id):
     buttons = [
-        [{"text": province}] for province in PROVINCES
+        [{"text": "Toda España / All Spain"}]
     ]
-    buttons.insert(0, [{"text": "Toda España / All Spain"}])
+
+    buttons.extend(
+        [[{"text": province}] for province in PROVINCES]
+    )
 
     send_message(
         chat_id,
         "Select your province / Selecciona tu provincia:",
-        {"keyboard": buttons, "resize_keyboard": True}
+        {
+            "keyboard": buttons,
+            "resize_keyboard": True
+        }
     )
 
+
+def process_update(update):
+    message = update.get("message", {})
+
+    chat_id = message.get("chat", {}).get("id")
+    user_text = message.get("text", "").strip()
+
+    if not chat_id or not user_text:
+        print("Ignored update without a text message.")
+        return
+
+    print(
+        f"Processing update {update.get('update_id')} "
+        f"with message: {user_text}"
+    )
+
+    if user_text == "/start":
+        send_message(
+            chat_id,
+            "Welcome to TIE Appointment Monitor!\n"
+            "¡Bienvenido al monitor de citas TIE!\n\n"
+            "Choose an option below / Elige una opción:"
+        )
+        show_services(chat_id)
+
+    elif user_text == "/help":
+        send_message(
+            chat_id,
+            "Commands / Comandos:\n"
+            "/start - Start the bot\n"
+            "/province - Select a province\n"
+            "/help - Help"
+        )
+
+    elif user_text == "/province":
+        show_provinces(chat_id)
+
+    elif user_text in SERVICES:
+        send_message(
+            chat_id,
+            "Selected service / Trámite seleccionado:\n"
+            + user_text
+        )
+        show_provinces(chat_id)
+
+    elif user_text == "Toda España / All Spain":
+        send_message(
+            chat_id,
+            "Selected: All Spain / Toda España.\n\n"
+            "Appointment checking is not active yet.\n"
+            "La búsqueda de citas todavía no está activa."
+        )
+
+    elif user_text in PROVINCES:
+        send_message(
+            chat_id,
+            f"Selected province: {user_text}\n"
+            f"Provincia seleccionada: {user_text}\n\n"
+            "Appointment checking is not active yet.\n"
+            "La búsqueda de citas todavía no está activa."
+        )
+
+    else:
+        send_message(
+            chat_id,
+            "Please use /start or /province.\n"
+            "Por favor, utiliza /start o /province."
+        )
+
+
 def main():
-    result = telegram("getUpdates", {"timeout": 0})
+    print("Madrid TIE Monitor started.")
 
-    for update in result.get("result", []):
-        message = update.get("message", {})
-        chat_id = message.get("chat", {}).get("id")
-        user_text = message.get("text", "").strip()
+    result = telegram(
+        "getUpdates",
+        {
+            "timeout": 0,
+            "allowed_updates": json.dumps(["message"])
+        }
+    )
 
-        if not chat_id:
-            continue
+    updates = result.get("result", [])
 
-        if user_text == "/start":
-            send_message(
-                chat_id,
-                "Welcome to TIE Appointment Monitor!\n"
-                "Bienvenido al monitor de citas TIE!\n\n"
-                "Use /province to select a province."
-            )
-        elif user_text in SERVICES:
-            send_message(
-                chat_id,
-                "Selected service / Trámite seleccionado:\n"
-                + user_text
-            )
-            show_provinces(chat_id)
-        elif user_text == "/province":
-            show_provinces(chat_id)
+    print(f"Received {len(updates)} update(s).")
 
-        elif user_text == "Toda España / All Spain":
-            send_message(
-                chat_id,
-                "Selected: All Spain / Toda España.\n"
-                "Appointment checking is not active yet."
+    for update in updates:
+        try:
+            process_update(update)
+        except Exception as error:
+            print(
+                f"Error processing update "
+                f"{update.get('update_id')}: {error}"
             )
 
-        elif user_text in PROVINCES:
-            send_message(
-                chat_id,
-                f"Selected: {user_text}\n"
-                f"Provincia seleccionada: {user_text}\n\n"
-                "Appointment checking is not active yet."
-            )
+    if updates:
+        last_id = updates[-1]["update_id"]
 
-        elif user_text in PROVINCES:
-            send_message(
-                chat_id,
-                "Province selected: " + user_text +
-                "\nProvincia seleccionada: " + user_text +
-                "\n\nAppointment search is not active yet."
-            )
+        telegram(
+            "getUpdates",
+            {
+                "offset": last_id + 1,
+                "timeout": 0
+            }
+        )
 
-        elif user_text == "/help":
-            send_message(
-                chat_id,
-                "Commands / Comandos:\n"
-                "/start - Start the bot\n"
-                "/province - Select a province\n"
-                "/help - Help"
-            )
+        print("Processed updates acknowledged.")
 
-        else:
-            send_message(
-                chat_id,
-                "Use /province to choose a province.\n"
-                "Usa /province para elegir una provincia."
-            )
+    print("Madrid TIE Monitor finished.")
 
-    if result.get("result"):
-        last_id = result["result"][-1]["update_id"]
-        telegram("getUpdates", {"offset": last_id + 1, "timeout": 0})
 
 if __name__ == "__main__":
     main()

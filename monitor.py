@@ -20,7 +20,8 @@ PROVINCES = [
     "Ourense", "Pontevedra", "Asturias", "Cantabria",
     "Álava", "Bizkaia", "Gipuzkoa", "Navarra",
     "La Rioja", "Huesca", "Teruel", "Las Palmas",
-    "Santa Cruz de Tenerife", "Baleares"
+    "Santa Cruz de Tenerife", "Baleares",
+"Ceuta", "Melilla"
 ]
 
 def telegram(method, data=None):

@@ -96,6 +96,14 @@ def main():
                 "Appointment checking is not active yet."
             )
 
+        elif user_text in PROVINCES:
+            send_message(
+                chat_id,
+                "Province selected: " + user_text +
+                "\nProvincia seleccionada: " + user_text +
+                "\n\nAppointment search is not active yet."
+            )
+
         elif user_text == "/help":
             send_message(
                 chat_id,

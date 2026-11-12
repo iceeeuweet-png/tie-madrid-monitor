@@ -71,7 +71,13 @@ def main():
                 "Bienvenido al monitor de citas TIE!\n\n"
                 "Use /province to select a province."
             )
-
+        elif user_text in SERVICES:
+            send_message(
+                chat_id,
+                "Selected service / Trámite seleccionado:\n"
+                + user_text
+            )
+            show_provinces(chat_id)
         elif user_text == "/province":
             show_provinces(chat_id)
 
